@@ -11,8 +11,8 @@ app.use(express.json());
 app.use('/api/v3/app', eventsRoute);
 
 
-var port = process.env.PORT || "3000";
-app.listen(8000, (err) => {
+var port = process.env.PORT || 8000;
+app.listen(port, (err) => {
   if (err) throw err;
   console.log("Server listening on port", port);
 });
