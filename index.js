@@ -1,8 +1,6 @@
-
 const eventsRoute = require('./routes/events');
 const express = require('express');
 let cors=require("cors");
-let mongodb=require("mongodb")
 let bodyParser=require("body-parser")
 const app = express();
 app.use(cors());

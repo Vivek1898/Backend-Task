@@ -2,161 +2,255 @@
 let express=require("express");
 const router = express.Router();
 let mongodb=require("mongodb")
+var fs = require("file-system");
+var path = require("path");
 
+var multer = require("multer");
 
+//Connection and Database
 
-let password=`admin`;
-let db_name=`mern-db`;
-let collection_name=`employees`
-let db_url=`mongodb+srv://admin:${password}@cluster0.x0us0.mongodb.net/${db_name}?retryWrites=true&w=majority`
 
 
 let mernClient=mongodb.MongoClient;
-function paginatedResults() {
-    return async (req, res, next) => {
-      
-      const page = parseInt(req.query.page);
-      const limit = parseInt(req.query.limit);
-      const skipIndex = (page - 1) * limit;
-      const results = {};
+
+
+//Defining Storage for multer
+
+var storage = multer.diskStorage({
+    destination: (req, file, cb) => {
+      cb(null, "uploads");
+    },
+    filename: (req, file, cb) => {
+      cb(
+        null,
+        file.fieldname + "-" + Date.now() + path.extname(file.originalname)
+      );
+    },
+  });
   
-      try {
-        results.results = await arr.find()
-          .sort({ _id: 1 })
-          .limit(limit)
-          .skip(skipIndex)
-          .exec();
-        res.paginatedResults = results;
-        next();
-      } catch (e) {
-        res.status(500).json({ message: "Error Occured" });
-      }
+  var upload = multer({ storage: storage });
+
+
+
+
+
+//get Paginated Data
+router.get("/events", (req, res) => {
+    var query1 = require("url").parse(req.url, true).query;
+    var pageNo = parseInt(query1.pageNo);
+    var size = parseInt(query1.size);
+
+    if(pageNo && size){
+        if (pageNo < 0 || pageNo === 0) {
+            response = {
+              error: true,
+              message: "invalid page number, should start with 1",
+            };
+            return res.json(response);
+          }
+          console.log(query1.type);
+          var order;
+          if (query1.type === "latest") {
+            order = -1;
+          } else {
+            order = 1;
+          }
+          var startFrom = size * (pageNo - 1);
+          var perPage = size;
+        
+          mernClient.connect(db_url, (err, client) => {
+            if (err) throw err;
+            else {
+              let db = client.db(db_name);
+              db.collection(collection_name)
+                .find()
+                .sort({ date: order })
+                .skip(startFrom)
+                .limit(perPage)
+                .toArray((err, arr) => {
+                  if (err) throw err;
+                  else {
+                    res.send(arr);
+                  }
+                });
+            }
+          });
+    }else{
+        mernClient.connect(db_url, { useNewUrlParser: true }, (err, client) => {
+            if (err) res.status(400).send({ message: "Enter Correct Id" });
+            else {
+              var query = require("url").parse(req.url, true).query;
+              var imageId = query.id;
+              console.log(imageId);
+        
+              let db = client.db(db_name);
+        
+              db.collection(collection_name)
+                .find({ uid: imageId })
+                .toArray((err, array) => {
+                  if (!array.length) {
+                    res.status(400).send({ message: "Enter Correct Id" });
+                    //throw err;
+                  } else {
+                    res.send(array[0]);
+                  }
+                });
+            }
+          });
+    }
+  
+   
+  });
+  
+ 
+  
+  //Sucess
+  router.post("/events", upload.single("myImage"), (req, res, next) => {
+    if (req.file) {
+      var img = fs.readFileSync(req.file.path);
+      var encoded_img = img.toString("base64");
+      // console.log(encoded_img);
+      // return;
+      var finalImage = {
+        contentType: req.file.mimetype,
+        path: req.file.path,
+        image: encoded_img,
+      };
+    }
+    var obj = {
+      uid: req.body.uid,
+      name: req.body.name,
+      tagline: req.body.tagline,
+      schedule: req.body.schedule,
+      desc: req.body.desc,
+      moderator: req.body.moderator,
+      category: req.body.category,
+      sub_category: req.body.sub_category,
+      rigor_rank: req.body.regor_rank,
+  
+      myImage: finalImage,
+  
+      attendees: [req.body.attendees],
+      date: new Date(),
     };
-}
 
-router.get("/events",(req,res) =>{
 
-    mernClient.connect(db_url,(err,client)=>{
-        if(err) throw err;
-            else{
-                //throw client object
-                //database instance
-                router.get("/events",(req,res) =>{
+    //Validation
 
-    mernClient.connect(db_url,(err,client)=>{
-        if(err) throw err;
-            else{
-                var pageNo = parseInt(req.query.pageNo)
-                var size = parseInt(req.query.size)
-                var query = {}
-                if(pageNo < 0 || pageNo === 0) {
-                      response = {"error" : true,"message" : "invalid page number, should start with 1"};
-                      return res.json(response)
-                }
-                query.skip = size * (pageNo - 1)
-                query.limit = size
-                //throw client object
-                //database instance
-               let db= client.db(db_name);
-               db.collection(collection_name).find({},{},query,
-              function (err, result) {
-                 if (err) {
-                    response = {"error" : true,"message" : "Error fetching data"};
-                } else {
-                    response = {"error" : false,"message" : data};
-                 }
-                 res.json(response.paginatedResults);
-               })
+
+  
+    mernClient.connect(db_url, { useNewUrlParser: true }, (err, client) => {
+      if (err) throw err;
+      else {
+        console.log("Connection Sucess");
+        let db = client.db(db_name);
+  
+        db.collection(collection_name).insertOne(obj, (err, result) => {
+          if (err) throw err;
+          else {
+            console.log(`Added a new match with id ${result.insertedId}`);
+            res.send({
+              insert: `Added a new match with id ${result.insertedId}`,
+            });
+          }
+        });
+      }
+    });
+  });
+  
+
+  
+  //Update
+  //Sucess
+  router.put("/events/:id", upload.single("myImage"), (req, res) => {
+    var imageId = req.params.id;
+    console.log(imageId);
+    if (req.file) {
+      var img = fs.readFileSync(req.file.path);
+      var encoded_img = img.toString("base64");
+  
+      var finalImage = {
+        contentType: req.file.mimetype,
+        path: req.file.path,
+        image: encoded_img,
+      };
+    }
+  
+    const updates = {
+      $set: {
+        name: req.body.name,
+        tagline: req.body.tagline,
+        schedule: req.body.schedule,
+        desc: req.body.desc,
+        moderator: req.body.moderator,
+        category: req.body.category,
+        sub_category: req.body.sub_category,
+        rigor_rank: req.body.rigor_rank,
+  
+        myImage: finalImage,
+        date: new Date(),
+      },
+  
+      $push: {
+        attendees: req.body.attendees,
+      },
+    };
+  
+    mernClient.connect(db_url, (err, client) => {
+      if (err) throw err;
+      else {
+        let db = client.db(db_name);
+        if (req.body.attendees != null) {
+          db.collection(collection_name).update(
+            { uid: req.params.id },
+            {
+              $set: {
+                attendees: [],
+              },
+            },
+            { multi: true },
+            (err, result, next) => {
+              if (err) throw err;
+              else {
+                console.log("Arr");
+              }
             }
-        })
-});
-               let db= client.db(db_name);
-               db.collection(collection_name).find({}).limit(50)
-               .toArray(function (err, result) {
-                 if (err) {
-                   res.status(400).send("Error fetching listings!");
-                } else {
-                   res.json(result);
-                 }
-               })
-            }
-        })
-});
-router.get("/eventsog",(req,res) =>{
-
-    mernClient.connect(db_url,(err,client)=>{
-        if(err) throw err;
-            else{
-                //throw client object
-                //database instance
-               let db= client.db(db_name);
-               db.collection(collection_name).find({}).then(function (err, result) {
-                 if (err) {
-                   res.status(400).send("Error fetching listings!");
-                } else {
-                   res.json(result);
-                 }
-               })
-            }
-        })
-});
-
-router.post("/events/new",(req,res) =>{
-    
-    //JSON obj based on client data
-    let obj={
-       //ADD Data
-
-    }; 
-    mernClient.connect(db_url,(err,client)=>{
-        if(err) throw err;
-        else{
-            let db=client.db(db_name);
-            db.collection(collection_name).insertOne(obj,(err,result)=>{
-                if(err) throw err;
-                else{
-                    res.send({insert:"Sucess"});
-                }
-            })
+          );
         }
-    })
-});
-
-// based on ID
-router.put("/events",(req,res)=>{
-    mernClient.connect(db_url,(err,client)=>{
-        if(err) throw err;
-        else{
-            let db=client.db(db_name);
-            db.collection(collection_name).updateOne({"id":req.body.id},{$set:{//TO UPDATE
-                                                                                }},(err,result)=>{
-                                                                                    if(err) throw err;
-                                                                                    else{
-                                                                                        res.send({update:"Sucess"});
-                                                                                    }
-                                                                                });
-        } 
-    })
-});
-
-
-
-//Delete Request
-//BASED ON ID
-router.delete("/events",(req,res)=>{
-    mernClient.connect(db_url,(err,client)=>{
-        if(err) throw err;
-        else{
-            let db=client.db(db_name);
-            db.collection(collection_name).deleteOne({"id":req.body.id},(err,result)=>{
-                if(err) throw error;
-                else{
-                res.send({delete:"Sucessful"});
-                }
-            })
-            
-            
-        }
-    })
-})
+        db.collection(collection_name).findOneAndUpdate(
+          { uid: req.params.id },
+          updates,
+          {},
+          (err, result) => {
+            if (err) throw err;
+            else {
+              res.send({ update: "Sucess" });
+            }
+          }
+        );
+      }
+    });
+  });
+  
+  //Sucess
+  
+  router.delete("/events/:id", (req, res) => {
+    mernClient.connect(db_url, (err, client) => {
+      if (err) throw err;
+      else {
+        const deleteQuery = { uid: req.params.id };
+        let db = client.db(db_name);
+        db.collection(collection_name).deleteOne(deleteQuery, (err, result) => {
+          if (err) {
+            res
+              .status(400)
+              .send(`Error deleting listing with id ${deleteQuery.uid}!`);
+          } else {
+            console.log("1 document deleted");
+            res.send({ delete: "Sucessful" });
+          }
+        });
+      }
+    });
+  });
 module.exports = router;
