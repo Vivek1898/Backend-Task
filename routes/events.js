@@ -7,15 +7,21 @@ var ObjectId = require('mongodb').ObjectID;
 var multer = require("multer");
 
 
-//POST
+//POST  -> Only POST Items with unique Id
+//    -> all fields are mandatory else it returns Field not found
 //http://localhost:8000/api/v3/app/events
 
 //GET (PAGINATION) -> http://localhost:8000/api/v3/app/events?type=latest&limit=5&page=1
-//GET (BY UNIQUE ID) -> http://localhost:8000/api/v3/app/events?id=25811
 
-//DELETE
+//GET (BY UNIQUE ID) -> If Id is present in Database then it returns item else Failure
+//http://localhost:8000/api/v3/app/events?id=25811
+
+
+//DELETE ->  If Id is present in Database then it returns item else Failure
 // http://localhost:8000/api/v3/app/events/8527
-//PUT
+
+
+//PUT -> If Id is present in Database then it returns item else Failure
 //http://localhost:8000/api/v3/app/events/8527
 
 
@@ -23,10 +29,10 @@ var multer = require("multer");
 
 //Connection and Database
 
-let password = `admin`;
-let db_name = `mern-db`;
-let collection_name = `employees`;
-let db_url = `mongodb+srv://admin:${password}@cluster0.x0us0.mongodb.net/${db_name}?retryWrites=true&w=majority`;
+
+let db_name = `events-db`;
+let collection_name = `events`;
+let db_url = `mongodb://localhost:27017/`;
 
 let mernClient = mongodb.MongoClient;
 
@@ -132,6 +138,7 @@ router.post("/events", upload.single("myImage"), (req, res, next) => {
   }
 
   var obj = {
+    type:req.body.type,
     uid: parseInt(req.body.uid),
     name: req.body.name,
     tagline: req.body.tagline,
@@ -149,8 +156,8 @@ router.post("/events", upload.single("myImage"), (req, res, next) => {
 
 
   //Validation
-
-  if (!obj.uid)
+  if (!obj.type) res.status(400).send({ message: "Type Required" });
+ else if (!obj.uid)
     res.status(400).send({ message: "Enter UID (Must Be Integer Value)" });
     
   else if (!obj.name) res.status(400).send({ message: "Name Required" });
@@ -224,6 +231,8 @@ router.put("/events/:id", upload.single("myImage"), (req, res) => {
 
   const updates = {
     $set: {
+     type:req.body.type,
+     uid: parseInt(req.body.uid),
       name: req.body.name,
       tagline: req.body.tagline,
       schedule: req.body.schedule,
